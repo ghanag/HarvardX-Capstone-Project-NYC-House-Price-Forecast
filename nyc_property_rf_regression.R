@@ -14,8 +14,6 @@ library(e1071)
 library(lubridate)
 
 ## Options for running the code
-# sol_opt  1: Random Forest Algorithm  2: Linear Regression Algorithm 
-sol_opt = 1       
 # is_tune    1: Tune parameters in the Random Forest model
 #            0: Don't tune. Train the Random Forest model using mtry_input
 is_tune = 0       
@@ -29,7 +27,7 @@ mtry_input = 6
 start_time <- Sys.time()
 
 # Download dataset from Github and read the csv file
-download.file("https://github.com/ghanag/HarvardX-Capstone-Project-NYC-House-Price-Forecast/raw/main/nyc-rolling-sales.csv",
+download.file("https://github.com/ghanag/HarvardX-Capstone-Project-NYC-House-Price-Forecast/raw/master/nyc-rolling-sales.csv",
               "./nyc-rolling-sales.csv")
 nyc_house_data <- read.csv("nyc-rolling-sales.csv")
 
@@ -253,7 +251,7 @@ corrs   <- cor(nyc_house_data[,num_col])
 corrplot(corrs, method="square")
 
 # Create training and test sets
-set.seed(1)
+set.seed(1, sample.kind = "Rounding")
 test_index <- createDataPartition(y = nyc_house_data$SALE.PRICE, times = 1,
                                   p = 0.1, list = FALSE)
 train_set <- nyc_house_data[-test_index,]
@@ -272,82 +270,56 @@ for(x in seq(1,ncol(nyc_house_data)))
 
 # Algorithm 1: RandomForest
 # Remove Categorical Variables with more than 53 levels since RandomForest cannot handle that
-if(sol_opt == 1){
-  nyc_house_data <- subset(nyc_house_data, select = -c(NEIGHBORHOOD,BUILDING.CLASS.AT.PRESENT,
-                                                  BUILDING.CLASS.AT.TIME.OF.SALE
-  ))
-  test_set <- subset(test_set, select = -c(NEIGHBORHOOD,BUILDING.CLASS.AT.PRESENT,
+test_set_rf <- subset(test_set, select = -c(NEIGHBORHOOD,BUILDING.CLASS.AT.PRESENT,
                                                  BUILDING.CLASS.AT.TIME.OF.SALE
   ))
-  train_set <- subset(train_set, select = -c(NEIGHBORHOOD,BUILDING.CLASS.AT.PRESENT,
+train_set_rf <- subset(train_set, select = -c(NEIGHBORHOOD,BUILDING.CLASS.AT.PRESENT,
                                                        BUILDING.CLASS.AT.TIME.OF.SALE
                                                        ))
-}
 # If is_tune = 1, the code tunes the mtry parameter, which is the number of variables
 # randomly sampled at each split
-if(sol_opt == 1) {
-  if(is_tune == 1) {
-    nyc_house_forest1 <- train(
-      SALE.PRICE ~ .,
-      data = train_set,
-      method = "rf",
-      tuneGrid = data.frame(mtry = seq(2, 6, 1))
-    )
-    print(nyc_house_forest1$finalModel)
-    print(nyc_house_forest1$bestTune)        
-    print(nyc_house_forest1$results)
-    print(importance(nyc_house_forest1))           # Variable Importance measure   
-    varImpPlot(nyc_house_forest1, cex = 0.5)       # Chart of Variable Importance
-    fit1 <- predict(nyc_house_forest1, newdata = test_set)
-    data1 = data.frame(obs=test_set$SALE.PRICE, pred=fit1)
-    defaultSummary(exp(data1-1))     # Compare model prediction with test_set 
-  } else{
-    # Random Forest Training with the mtry_input value
-    nyc_house_forest2 <- randomForest(SALE.PRICE ~ . ,
-                                      data = train_set, mtry = mtry_input, importance = T)
-    print(nyc_house_forest2)
-    print(importance(nyc_house_forest2))           # Variable Importance measure   
-    varImpPlot(nyc_house_forest2, cex = 0.5)       # Chart of Variable Importance
-    
-    fit2 <- predict(nyc_house_forest2, newdata = test_set)
-    data2 = data.frame(obs=test_set$SALE.PRICE, pred=fit2)
-    defaultSummary(exp(data2-1))     # Compare model prediction with test_set        
-  }
-}
-# Linear Regression
-# Remove the same parameters as the ones for Random Forest for comparison purpose
 
-# Convert character factors to numeric factors
-if(sol_opt == 2) {nyc_house_data$BUILDING.CLASS.CATEGORY <- as.factor(as.numeric(
-  nyc_house_data$BUILDING.CLASS.CATEGORY))
-
-nyc_house_data$TAX.CLASS.AT.PRESENT <- as.factor(as.numeric(
-  nyc_house_data$TAX.CLASS.AT.PRESENT))
-
-nyc_house_data$NEIGHBORHOOD <- as.factor(as.numeric(
-  nyc_house_data$NEIGHBORHOOD))
-
-nyc_house_data$BUILDING.CLASS.AT.PRESENT <- as.factor(as.numeric(
-  nyc_house_data$BUILDING.CLASS.AT.PRESENT))
-
-nyc_house_data$BUILDING.CLASS.AT.TIME.OF.SALE <- as.factor(as.numeric(
-  nyc_house_data$BUILDING.CLASS.AT.TIME.OF.SALE))
-}
-# Use Linear Regression to Predict Property Sale Prices
-if(sol_opt == 2) {
-  nyc_house_data <- subset(nyc_house_data, select = -c(NEIGHBORHOOD, 
-                                                       BUILDING.CLASS.AT.PRESENT,
-                                                       BUILDING.CLASS.AT.TIME.OF.SALE))
-
-  model_lm=train(SALE.PRICE~., 
-             data=train_set,
-             method="lm"
+if(is_tune == 1) {
+  nyc_house_forest1 <- train(
+    SALE.PRICE ~ .,
+    data = train_set_rf,
+    method = "rf",
+    tuneGrid = data.frame(mtry = seq(2, 6, 1))
   )
-
-  fit_lm <- predict(model_lm, newdata = test_set)
-  data = data.frame(obs=test_set$SALE.PRICE, pred=fit_lm)
-  defaultSummary(exp(data-1))           # Compare the model prediction with test_set sale prices
+  print(nyc_house_forest1$finalModel)
+  print(nyc_house_forest1$bestTune)        
+  print(nyc_house_forest1$results)
+  print(importance(nyc_house_forest1))           # Variable Importance measure   
+  varImpPlot(nyc_house_forest1, cex = 0.5)       # Chart of Variable Importance
+  fit1 <- predict(nyc_house_forest1, newdata = test_set_rf)
+  data1 = data.frame(obs=test_set_rf$SALE.PRICE, pred=fit1)
+  defaultSummary(exp(data1-1))     # Compare model prediction with test_set 
+} else{
+  # Random Forest Training with the mtry_input value
+  nyc_house_forest2 <- randomForest(SALE.PRICE ~ . ,
+                                    data = train_set_rf, mtry = mtry_input, importance = T)
+  print(nyc_house_forest2)
+  print(importance(nyc_house_forest2))           # Variable Importance measure   
+  varImpPlot(nyc_house_forest2, cex = 0.5)       # Chart of Variable Importance
+  
+  fit2 <- predict(nyc_house_forest2, newdata = test_set_rf)
+  data2 = data.frame(obs=test_set_rf$SALE.PRICE, pred=fit2)
+  defaultSummary(exp(data2-1))     # Compare model prediction with test_set        
 }
+
+# Linear Regression
+
+# Use Linear Regression to Predict Property Sale Prices
+
+model_lm=train(SALE.PRICE~., 
+               data=train_set,
+               method="lm"
+)
+
+fit_lm <- predict(model_lm, newdata = test_set)
+data = data.frame(obs=test_set$SALE.PRICE, pred=fit_lm)
+defaultSummary(exp(data-1))           # Compare the model prediction with test_set sale prices
+
 
 end_time <- Sys.time()
 run_time = end_time - start_time
